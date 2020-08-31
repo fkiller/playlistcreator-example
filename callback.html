@@ -114,7 +114,12 @@
 
 		function sortAlbums() {
 			console.log('sortAlbums');
-			g_albums.sort((a,b)=>parseInt(b.release_date.split('-').join('').padEnd(8,'0')) - parseInt(a.release_date.split('-').join('').padEnd(8,'0')))
+			g_albums.sort((a, b) => parseInt(b.release_date.split('-').join('').padEnd(8, '0')) - parseInt(a.release_date.split('-').join('').padEnd(8, '0')))
+		}
+
+		function convertAlbumstotracks() {
+			console.log('convertAlbumstotracks');
+			g_albums.forEach((album) => (album.tracks) ? album.tracks.forEach((track) => g_tracks.push(track.uri)) : null);
 		}
 
 		function getUsername(callback) {
@@ -160,24 +165,29 @@
 			});
 		}
 
-		function addTracksToPlaylist(username, playlist, tracks, callback) {
+		function addTracksToPlaylist(username, playlist, tracks, start, callback) {
 			console.log('addTracksToPlaylist', username, playlist, tracks);
 			var url = 'https://api.spotify.com/v1/users/' + username +
 				'/playlists/' + playlist +
 				'/tracks'; // ?uris='+encodeURIComponent(tracks.join(','));
 			$.ajax(url, {
 				method: 'POST',
-				data: JSON.stringify(tracks),
+				data: JSON.stringify(tracks.slice(start,start+99)),
 				dataType: 'text',
 				headers: {
 					'Authorization': 'Bearer ' + g_access_token,
 					'Content-Type': 'application/json'
 				},
 				success: function (r) {
-					console.log('add track response', r);
-					callback(r.id);
+					console.log(`add track response (${start+99}/${tracks.length})`);
+					if (start+99 < 10000 && start+99 < tracks.length) {
+						addTracksToPlaylist(username, playlist, tracks, start+100, callback);
+					} else {
+						callback(r.id);
+					}
 				},
 				error: function (r) {
+					console.log('error',r);
 					callback(null);
 				}
 			});
@@ -196,8 +206,9 @@
 				args[key] = val;
 			});
 
-			g_name = localStorage.getItem('createplaylist-name');
-			g_tracks = JSON.parse(localStorage.getItem('createplaylist-tracks'));
+			//g_name = localStorage.getItem('createplaylist-name');
+			g_name = 'SmartPlaylist_20200830';
+			//g_tracks = JSON.parse(localStorage.getItem('createplaylist-tracks'));
 
 			console.log('got args', args);
 
@@ -211,7 +222,7 @@
 				console.log('getFollowedartists callback finished');
 				console.log(data);
 
-				for (var i = 0; i < 10; i++) { //data.items.length
+				for (var i = 0; i < data.items.length; i++) { //data.items.length
 					let promise = new Promise((resolve) => {
 						getArtistalbums(data.items[i].id, function (data2) {
 							console.log('getArtistalbums callback finished');
@@ -229,9 +240,9 @@
 				// console.log('sort done');
 				// console.log(g_albums);
 
-				var filterdate = 20200801;
+				var filterdate = 20200101; //20200801
 
-				for (var i = 0; parseInt(i.release_date.split('-').join('').padEnd(8,'0')) < filterdate && i < g_albums.length; i++) {
+				for (var i = 0; parseInt(g_albums[i].release_date.split('-').join('').padEnd(8, '0')) > filterdate && i < g_albums.length; i++) {
 					let promise = new Promise((resolve) => {
 						getAlbumtracks(g_albums[i].id, function (data2) {
 							console.log('getAlbumtracks callback finished');
@@ -245,21 +256,25 @@
 
 				console.log('await done');
 				console.log(g_albums);
+				convertAlbumstotracks();
+				console.log('convert done');
+				console.log(g_tracks);
+
+				getUsername(function (username) {
+					console.log('got username', username);
+					createPlaylist(username, g_name, function (playlist) {
+						console.log('created playlist', playlist);
+						addTracksToPlaylist(username, playlist, g_tracks, 0, function () {
+							console.log('tracks added.');
+							$('#playlistlink').attr('href', 'spotify:user:' + username + ':playlist:' + playlist);
+							$('#creating').hide();
+							$('#done').show();
+						});
+					});
+				});
+
 			})
 
-
-			// getUsername(function(username) {
-			// 	console.log('got username', username);
-			// 	createPlaylist(username, g_name, function(playlist) {
-			// 		console.log('created playlist', playlist);
-			// 		addTracksToPlaylist(username, playlist, g_tracks, function() {
-			// 			console.log('tracks added.');
-			// 			$('#playlistlink').attr('href', 'spotify:user:'+username+':playlist:'+playlist);
-			// 			$('#creating').hide();
-			// 			$('#done').show();
-			// 		});
-			// 	});
-			// });
 		}
 
 	</script>
