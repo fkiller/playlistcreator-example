@@ -113,6 +113,23 @@
 			});
 		}
 
+		function removeDuplicateTracks() {
+			console.log('removeDuplicateTracks');
+			var uniquetracks = [];
+			for(var i=g_tracks.length-1;i>=0;i--)
+			{
+				//console.log(`g_tracks[${i}]=${JSON.stringify(g_tracks[i])}`);
+				if (uniquetracks.findIndex((item)=>{
+					if (item.searchartist===g_tracks[i].searchartist && g_tracks[i].name.toLowerCase()===item.name.toLowerCase()) {
+						//console.log(`found.. (${item})...\n${item.searchartist}===${g_tracks[i].searchartist} && ${g_tracks[i].name.toLowerCase()}===${item.name.toLowerCase()}`);
+						return true;
+					}
+					return false;
+				})<0) uniquetracks.unshift(g_tracks[i]);
+			}
+			g_tracks = uniquetracks;
+		}
+
 		function sortAlbums() {
 			console.log('sortAlbums');
 			g_albums.sort((a, b) => parseInt(b.release_date.split('-').join('').padEnd(8, '0')) - parseInt(a.release_date.split('-').join('').padEnd(8, '0')))
@@ -120,7 +137,10 @@
 
 		function convertAlbumstotracks() {
 			console.log('convertAlbumstotracks');
-			g_albums.forEach((album) => (album.tracks) ? album.tracks.forEach((track) => g_tracks.push(track.uri)) : null);
+			g_albums.forEach((album) => (album.tracks) ? album.tracks.forEach((track) => {
+				track.searchartist=album.searchartist; 
+				g_tracks.push(track)
+			}) : null);
 		}
 
 		function getUsername(callback) {
@@ -243,6 +263,14 @@
 
 				var filterdate = 0; //20200801
 
+				// if (g_albums.lastupdated) {
+				// 	var lastupdated = new Date(g_albums.lastupdated);
+				// 	filterdate = parseInt(`${lastupdated.getFullYear()}${lastupdated.getMonth().padStart(2,'0')}${lastupdated.getDay().padStart(2,'0')}`);
+				// }
+
+				// g_albums.lastupdated = Date.now();
+				// localStorage.setItem('g_albums',JSON.stringify(g_albums));
+
 				for (var i = 0; i < g_albums.length && g_albums[i].release_date && parseInt(g_albums[i].release_date.split('-').join('').padEnd(8, '0')) > filterdate; i++) {
 					let promise = new Promise((resolve) => {
 						getAlbumtracks(g_albums[i].id, g_albums[i].searchartist, function (data2) {
@@ -261,11 +289,15 @@
 				console.log('convert done');
 				console.log(g_tracks);
 
+				removeDuplicateTracks();
+				console.log('removeDuplicateTracks done');
+				console.log(g_tracks);
+
 				getUsername(function (username) {
 					console.log('got username', username);
 					createPlaylist(username, g_name, function (playlist) {
 						console.log('created playlist', playlist);
-						addTracksToPlaylist(username, playlist, g_tracks, 0, function () {
+						addTracksToPlaylist(username, playlist, g_tracks.map(item=>item.uri), 0, function () {
 							console.log('tracks added.');
 							$('#playlistlink').attr('href', 'spotify:user:' + username + ':playlist:' + playlist);
 							$('#creating').hide();
